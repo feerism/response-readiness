@@ -103,5 +103,4 @@
 **Intended use**
 
 * Run during alert triage and post incident review
-* Works as a terminal script or can be embedded in analyst forms
-* Optional CSV logging can record timestamp, answers, scores, and outcome for trend reporting
+
