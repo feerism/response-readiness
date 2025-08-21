@@ -1,0 +1,139 @@
+# Detection Outcome Classifier (yes/no/skip)
+# Adds explicit check for prevention cases:
+# - Malicious file quarantined, deleted, or blocked before user execution
+
+def ask3(prompt):
+    while True:
+        v = input(f"{prompt} (yes/no/skip): ").strip().lower()
+        if v in ("yes", "no", "skip"):
+            if v == "skip":
+                return None
+            return v == "yes"
+        print("Please answer 'yes', 'no', or 'skip'.")
+
+def b(x):
+    return bool(x)  # Treat None as False
+
+def score2(x, pts):
+    return pts if x is True else 0
+
+def main():
+    print("\n=== Detection Outcome Classifier ===\n")
+
+    # 1) Alert presence
+    alert = ask3("Was an alert generated?")
+
+    if alert is False:
+        incident_present = ask3("Was malicious activity later confirmed?")
+        print("\n--- Result ---")
+        if incident_present is True:
+            classification = "FALSE NEGATIVE (FN)"
+            reason = "No alert, but malicious activity existed."
+            action = "Improve detection coverage; review missed indicators and gaps."
+        elif incident_present is False:
+            classification = "TRUE NEGATIVE (TN)"
+            reason = "No alert and no malicious activity."
+            action = "No action needed; detection performed as expected."
+        else:
+            classification = "INDETERMINATE"
+            reason = "No alert, but unknown if malicious activity existed."
+            action = "Gather more evidence to determine incident presence."
+        print(f"Classification: {classification}\nReason: {reason}\nAction: {action}")
+        return
+
+    elif alert is None:
+        print("\n--- Result ---")
+        print("Classification: INDETERMINATE")
+        print("Reason: Whether an alert was generated is unknown (skipped).")
+        print("Action: Re-run the evaluation with complete data.")
+        return
+
+    # 2) Collect evaluation inputs
+    impact = ask3("Was there cybersecurity impact (unauthorized access/data loss/etc.)?")
+    evidence = ask3("Did logs/artifacts confirm malicious activity (execution/C2/exfil)?")
+    ti_match = ask3("Did threat intelligence match (malicious IP/hash/domain/pattern)?")
+    suspicious_behavior = ask3("Was user/asset behavior suspicious or abnormal?")
+    control_failure = ask3("Was there a control failure?")
+    business_impact = ask3("Was there business impact (outage/risk to operations)?")
+    authorized = ask3("Was the activity authorized/approved (e.g., change window, admin task)?")
+    expected = ask3("Was the activity expected/normal for this user/system at this time?")
+    red_team = ask3("Was the activity performed by an approved Red Team / security test?")
+
+    # **New prevention checks**
+    quarantined = ask3("Was the malicious file quarantined or deleted by controls?")
+    executed = ask3("Did the user execute or access the malicious payload?")
+
+    # 3) Extra FP checks with auto-skip logic
+    fp_vuln_false = ask3("Did the alert incorrectly indicate that a vulnerability is present?")
+    fp_content_false = None
+    fp_activity_false = None
+    if fp_vuln_false is not True:
+        fp_content_false = ask3("Did the tool incorrectly classify benign content as malicious?")
+        if fp_content_false is not True:
+            fp_activity_false = ask3("Was benign activity incorrectly classified as malicious?")
+
+    # 4) Determine evidence context
+    evidence_present = b(impact) or b(evidence) or b(ti_match)
+    any_fp_specific = b(fp_vuln_false) or b(fp_content_false) or b(fp_activity_false)
+
+    # 5) Scoring
+    risk_score = (
+        score2(impact, 2) + score2(evidence, 2) + score2(ti_match, 2) +
+        score2(suspicious_behavior, 1) + score2(business_impact, 1)
+    )
+    benign_score = (
+        score2(authorized, 1) + score2(expected, 1) + score2(red_team, 1)
+    )
+
+    # Control failure weighting
+    if b(control_failure):
+        if evidence_present:
+            risk_score += 2
+        else:
+            benign_score += 2
+
+    # 6) Classification logic
+    if b(red_team) and b(expected):
+        classification = "TRUE POSITIVE – BENIGN (TP-Benign)"
+        reason = "Alert matched approved/expected Red Team activity."
+        action = "Document Red Team exercise; tune alert to avoid unnecessary noise."
+
+    elif evidence_present and b(quarantined) and not b(executed) and not b(impact):
+        classification = "TRUE POSITIVE – PREVENTED (TP-Prevented)"
+        reason = "Malicious attempt detected and neutralized (quarantined/deleted) before user execution or impact."
+        action = "Document prevention success; validate rule accuracy and maintain controls."
+
+    elif evidence_present and not b(authorized):
+        classification = "TRUE POSITIVE – MALICIOUS (TP-Malicious)"
+        reason = "Malicious indicators or evidence present; activity not authorized."
+        action = "Perform full incident response (containment, eradication, recovery)."
+
+    elif evidence_present and (b(authorized) or b(red_team) or b(expected)):
+        classification = "TRUE POSITIVE – BENIGN (TP-Benign)"
+        reason = "Detection accurate; activity was approved, expected, or Red Team."
+        action = "Log as benign; consider tuning detections to reduce noise."
+
+    elif any_fp_specific:
+        classification = "FALSE POSITIVE (FP)"
+        reason = "Alert incorrectly flagged vulnerability, benign content, or benign activity."
+        action = "Refine detection rules, thresholds, or vulnerability signatures."
+
+    elif not evidence_present and not b(authorized) and not b(expected) and not b(red_team):
+        classification = "FALSE POSITIVE (FP)"
+        reason = "No evidence of malicious activity; event was neither authorized nor expected."
+        action = "Refine detection logic or correlation to prevent noise."
+
+    else:
+        classification = "INDETERMINATE"
+        reason = "Insufficient data due to skipped or inconclusive answers."
+        action = "Gather missing context (logs, approvals, intelligence) for accurate classification."
+
+    # 7) Output
+    print("\n--- Result ---")
+    print(f"Classification: {classification}")
+    print(f"Reason: {reason}")
+    print(f"Risk Score (0–13): {risk_score} | Benign Context Score (0–5): {benign_score}")
+    print(f"Action: {action}")
+
+if __name__ == "__main__":
+    main()
