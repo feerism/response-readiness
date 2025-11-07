@@ -68,7 +68,7 @@
 <body>
 
   <h1>Investigation Outcome Helper</h1>
-  <p>Select Yes / No / Not sure for each criterion. The standardized outcome is generated automatically.</p>
+  <p>Yes / No / Not sure. For matching, "No" includes No, Not sure, or blank.</p>
 
   <div class="grid">
     <label>
@@ -147,8 +147,9 @@
       return (document.getElementById(id).value || "").trim();
     }
 
-    function anyNotSure(){
-      return fields.some(id => v(id) === "NotSure");
+    // Treat No / NotSure / blank as "No-group"
+    function isNoGroup(val){
+      return val === "No" || val === "NotSure" || val === "";
     }
 
     function anySelected(){
@@ -165,30 +166,64 @@
 
       let outcome = "";
 
-      // If any "Not sure" -> force review
-      if (anyNotSure()) {
-        outcome = "Needs Review (Inputs Incomplete / Analyst Unsure)";
+      // 1) False Positive:
+      // If alert configuration is not definitively "Yes"
+      // (No / NotSure / blank) => treat as configuration issue => False Positive.
+      if (A !== "Yes") {
+        outcome = "False Positive (Alert Configuration Incorrect / Not Confirmed)";
       }
-      // Only evaluate mappings when all chosen values are Yes/No
-      else if (A === "No" && B === "Yes" && D === "No") {
-        outcome = "False Positive";
-      }
-      else if (A === "Yes" && B === "No" && C === "Yes" && D === "No") {
+      // 2) True Positive – No Impact, No Control Failure
+      else if (
+        A === "Yes" &&
+        isNoGroup(B) &&      // not authorized
+        C === "Yes" &&
+        isNoGroup(D)         // no / unknown impact
+      ) {
         outcome = "True Positive (No Impact, No Control Failure)";
       }
-      else if (A === "Yes" && B === "No" && C === "Yes" && D === "Yes") {
+      // 3) True Positive – Impact
+      else if (
+        A === "Yes" &&
+        isNoGroup(B) &&
+        C === "Yes" &&
+        D === "Yes"
+      ) {
         outcome = "True Positive (Impact)";
       }
-      else if (A === "Yes" && B === "No" && C === "No" && D === "No") {
+      // 4) True Positive – No Impact, Control Failure
+      else if (
+        A === "Yes" &&
+        isNoGroup(B) &&
+        isNoGroup(C) &&
+        isNoGroup(D)
+      ) {
         outcome = "True Positive (No Impact, Control Failure)";
       }
-      else if (A === "Yes" && B === "Yes" && E === "No" && F === "No") {
+      // 5) Benign True Positive
+      else if (
+        A === "Yes" &&
+        B === "Yes" &&
+        isNoGroup(E) &&
+        isNoGroup(F)
+      ) {
         outcome = "Benign True Positive";
       }
-      else if (A === "Yes" && B === "Yes" && E === "Yes" && F === "No") {
+      // 6) Benign True Positive – Fine-tuning Suppression
+      else if (
+        A === "Yes" &&
+        B === "Yes" &&
+        E === "Yes" &&
+        isNoGroup(F)
+      ) {
         outcome = "Benign True Positive (Fine-tuning Suppression)";
       }
-      else if (A === "Yes" && B === "Yes" && F === "Yes" && E === "No") {
+      // 7) Benign True Positive – Internal Security Testing
+      else if (
+        A === "Yes" &&
+        B === "Yes" &&
+        F === "Yes" &&
+        isNoGroup(E)
+      ) {
         outcome = "Benign True Positive (Internal Security Testing)";
       }
       else if (!anySelected()) {
