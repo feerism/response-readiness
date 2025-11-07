@@ -62,6 +62,13 @@
       font-size:15px;
       font-weight:600;
       color:#38bdf8;
+      margin-bottom:6px;
+    }
+    .outcome-details{
+      margin:0;
+      padding-left:18px;
+      color:#9ca3af;
+      font-size:12px;
     }
   </style>
 </head>
@@ -135,6 +142,7 @@
   <div class="outcome-box">
     <div class="outcome-label">Investigation outcome</div>
     <div id="outcome" class="outcome-value">Waiting for inputs</div>
+    <ul id="details" class="outcome-details"></ul>
   </div>
 
   <script>
@@ -156,6 +164,16 @@
       return fields.some(id => v(id) !== "");
     }
 
+    function setDetails(items){
+      const list = document.getElementById("details");
+      list.innerHTML = "";
+      (items || []).forEach(text => {
+        const li = document.createElement("li");
+        li.textContent = text;
+        list.appendChild(li);
+      });
+    }
+
     function updateOutcome(){
       const A = v("alertCfg");     // Alert configuration correct
       const B = v("activityAuth"); // Activity authorized
@@ -165,23 +183,33 @@
       const F = v("secTest");      // Security testing
 
       let outcome = "";
+      let bullets = [];
 
-      // 1) False Positive:
-      // If alert configuration is not definitively "Yes"
-      // (No / NotSure / blank) => treat as configuration issue => False Positive.
+      // 1) Config not confirmed as Yes => False Positive
       if (A !== "Yes") {
-        outcome = "False Positive (Alert Configuration Incorrect / Not Confirmed)";
+        outcome = "False Positive";
+        bullets = [
+          "Alert configuration not confirmed as correct",
+          "Treat alert as configuration or tuning issue",
+          "No validated cybersecurity impact"
+        ];
       }
-      // 2) True Positive – No Impact, No Control Failure
+      // 2) True Positive (No Impact, No Control Failure)
       else if (
         A === "Yes" &&
-        isNoGroup(B) &&      // not authorized
+        isNoGroup(B) &&
         C === "Yes" &&
-        isNoGroup(D)         // no / unknown impact
+        isNoGroup(D)
       ) {
         outcome = "True Positive (No Impact, No Control Failure)";
+        bullets = [
+          "Malicious or unauthorized activity detected",
+          "Threat contained or mitigated",
+          "No confirmed impact to assets or data",
+          "Alert coverage and response are adequate"
+        ];
       }
-      // 3) True Positive – Impact
+      // 3) True Positive (Impact)
       else if (
         A === "Yes" &&
         isNoGroup(B) &&
@@ -189,8 +217,13 @@
         D === "Yes"
       ) {
         outcome = "True Positive (Impact)";
+        bullets = [
+          "Malicious or unauthorized activity confirmed",
+          "Threat mitigated or contained",
+          "Cybersecurity impact confirmed"
+        ];
       }
-      // 4) True Positive – No Impact, Control Failure
+      // 4) True Positive (No Impact, Control Failure)
       else if (
         A === "Yes" &&
         isNoGroup(B) &&
@@ -198,6 +231,11 @@
         isNoGroup(D)
       ) {
         outcome = "True Positive (No Impact, Control Failure)";
+        bullets = [
+          "Malicious or unauthorized activity confirmed",
+          "No confirmed impact yet",
+          "Required controls or response actions not executed as expected"
+        ];
       }
       // 5) Benign True Positive
       else if (
@@ -207,17 +245,27 @@
         isNoGroup(F)
       ) {
         outcome = "Benign True Positive";
+        bullets = [
+          "Alert logic is correct",
+          "Activity is authorized and expected",
+          "No tuning or special handling required"
+        ];
       }
-      // 6) Benign True Positive – Fine-tuning Suppression
+      // 6) Benign True Positive (Fine tuning Suppression)
       else if (
         A === "Yes" &&
         B === "Yes" &&
         E === "Yes" &&
         isNoGroup(F)
       ) {
-        outcome = "Benign True Positive (Fine-tuning Suppression)";
+        outcome = "Benign True Positive (Fine Tuning Suppression)";
+        bullets = [
+          "Alert logic is correct",
+          "Activity is authorized",
+          "Pattern suitable for tuning or suppression to reduce noise"
+        ];
       }
-      // 7) Benign True Positive – Internal Security Testing
+      // 7) Benign True Positive (Internal Security Testing)
       else if (
         A === "Yes" &&
         B === "Yes" &&
@@ -225,15 +273,26 @@
         isNoGroup(E)
       ) {
         outcome = "Benign True Positive (Internal Security Testing)";
+        bullets = [
+          "Alert logic is correct",
+          "Activity linked to approved internal testing or simulation",
+          "No malicious intent or impact"
+        ];
       }
       else if (!anySelected()) {
         outcome = "Waiting for inputs";
+        bullets = [];
       }
       else {
         outcome = "Check inputs, no standard outcome matched";
+        bullets = [
+          "Review selections manually",
+          "Outcome does not fit standard decision patterns"
+        ];
       }
 
       document.getElementById("outcome").textContent = outcome;
+      setDetails(bullets);
     }
   </script>
 </body>
