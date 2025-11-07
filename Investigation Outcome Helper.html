@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Investigation Outcome Helper</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body{
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:#0b1220;
+      color:#e5e7eb;
+      margin:0;
+      padding:24px;
+    }
+    h1{
+      font-size:20px;
+      margin:0 0 8px;
+    }
+    p{
+      margin:0 0 16px;
+      color:#9ca3af;
+      font-size:13px;
+    }
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:12px 18px;
+      max-width:640px;
+      margin-bottom:20px;
+    }
+    label{
+      display:flex;
+      flex-direction:column;
+      font-size:12px;
+      color:#9ca3af;
+      gap:4px;
+    }
+    select{
+      padding:6px 8px;
+      border-radius:6px;
+      border:1px solid #4b5563;
+      background:#020817;
+      color:#e5e7eb;
+      font-size:13px;
+    }
+    .outcome-box{
+      max-width:640px;
+      padding:12px 14px;
+      border-radius:8px;
+      background:#111827;
+      border:1px solid #374151;
+      font-size:13px;
+    }
+    .outcome-label{
+      font-size:11px;
+      color:#6b7280;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      margin-bottom:4px;
+    }
+    .outcome-value{
+      font-size:15px;
+      font-weight:600;
+      color:#38bdf8;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Investigation Outcome Helper</h1>
+  <p>Select Yes / No / Not sure for each criterion. The standardized outcome is generated automatically.</p>
+
+  <div class="grid">
+    <label>
+      Alert configuration correct
+      <select id="alertCfg">
+        <option value="">Select</option>
+        <option value="Yes">Yes</option>
+        <option value="No">No</option>
+        <option value="NotSure">Not sure</option>
+      </select>
+    </label>
+
+    <label>
+      Activity authorized
+      <select id="activityAuth">
+        <option value="">Select</option>
+        <option value="Yes">Yes</option>
+        <option value="No">No</option>
+        <option value="NotSure">Not sure</option>
+      </select>
+    </label>
+
+    <label>
+      Threat mitigated
+      <select id="threatMit">
+        <option value="">Select</option>
+        <option value="Yes">Yes</option>
+        <option value="No">No</option>
+        <option value="NotSure">Not sure</option>
+      </select>
+    </label>
+
+    <label>
+      Cybersecurity impact
+      <select id="impact">
+        <option value="">Select</option>
+        <option value="Yes">Yes</option>
+        <option value="No">No</option>
+        <option value="NotSure">Not sure</option>
+      </select>
+    </label>
+
+    <label>
+      Fine tuning required
+      <select id="fineTune">
+        <option value="">Select</option>
+        <option value="Yes">Yes</option>
+        <option value="No">No</option>
+        <option value="NotSure">Not sure</option>
+      </select>
+    </label>
+
+    <label>
+      Internal security testing
+      <select id="secTest">
+        <option value="">Select</option>
+        <option value="Yes">Yes</option>
+        <option value="No">No</option>
+        <option value="NotSure">Not sure</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="outcome-box">
+    <div class="outcome-label">Investigation outcome</div>
+    <div id="outcome" class="outcome-value">Waiting for inputs</div>
+  </div>
+
+  <script>
+    const fields = ["alertCfg","activityAuth","threatMit","impact","fineTune","secTest"];
+    fields.forEach(id => {
+      document.getElementById(id).addEventListener("change", updateOutcome);
+    });
+
+    function v(id){
+      return (document.getElementById(id).value || "").trim();
+    }
+
+    function anyNotSure(){
+      return fields.some(id => v(id) === "NotSure");
+    }
+
+    function anySelected(){
+      return fields.some(id => v(id) !== "");
+    }
+
+    function updateOutcome(){
+      const A = v("alertCfg");     // Alert configuration correct
+      const B = v("activityAuth"); // Activity authorized
+      const C = v("threatMit");    // Threat mitigated
+      const D = v("impact");       // Cybersecurity impact
+      const E = v("fineTune");     // Fine tuning required
+      const F = v("secTest");      // Security testing
+
+      let outcome = "";
+
+      // If any "Not sure" -> force review
+      if (anyNotSure()) {
+        outcome = "Needs Review (Inputs Incomplete / Analyst Unsure)";
+      }
+      // Only evaluate mappings when all chosen values are Yes/No
+      else if (A === "No" && B === "Yes" && D === "No") {
+        outcome = "False Positive";
+      }
+      else if (A === "Yes" && B === "No" && C === "Yes" && D === "No") {
+        outcome = "True Positive (No Impact, No Control Failure)";
+      }
+      else if (A === "Yes" && B === "No" && C === "Yes" && D === "Yes") {
+        outcome = "True Positive (Impact)";
+      }
+      else if (A === "Yes" && B === "No" && C === "No" && D === "No") {
+        outcome = "True Positive (No Impact, Control Failure)";
+      }
+      else if (A === "Yes" && B === "Yes" && E === "No" && F === "No") {
+        outcome = "Benign True Positive";
+      }
+      else if (A === "Yes" && B === "Yes" && E === "Yes" && F === "No") {
+        outcome = "Benign True Positive (Fine-tuning Suppression)";
+      }
+      else if (A === "Yes" && B === "Yes" && F === "Yes" && E === "No") {
+        outcome = "Benign True Positive (Internal Security Testing)";
+      }
+      else if (!anySelected()) {
+        outcome = "Waiting for inputs";
+      }
+      else {
+        outcome = "Check inputs, no standard outcome matched";
+      }
+
+      document.getElementById("outcome").textContent = outcome;
+    }
+  </script>
+</body>
+</html>
