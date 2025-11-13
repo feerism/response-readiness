@@ -22,7 +22,7 @@
 <body>
 
 <h1>Investigation Outcome Helper</h1>
-<p>"Alert configuration correct" is mandatory. Other fields support Yes / No / Not sure. No hyphens in outcomes.</p>
+<p>Alert configuration is mandatory. “Not sure” on alert configuration follows the Yes logic. No hyphens in outcomes.</p>
 
 <div class="grid">
   <label>
@@ -65,7 +65,7 @@
     </select>
   </label>
 
-  <!-- These two rows are conditionally visible based on Activity expected -->
+  <!-- Shown only when Activity expected = Yes -->
   <label id="row-fineTune" class="hidden">
     Fine tuning required
     <select id="fineTune">
@@ -94,9 +94,7 @@
 </div>
 
 <script>
-  const ids = {
-    A:"alertCfg", B:"activityExp", C:"threatMit", D:"impact", E:"fineTune", F:"secTest"
-  };
+  const ids = { A:"alertCfg", B:"activityExp", C:"threatMit", D:"impact", E:"fineTune", F:"secTest" };
   const optFine = document.getElementById("row-fineTune");
   const optTest = document.getElementById("row-secTest");
 
@@ -116,10 +114,7 @@
   function showRows(show){
     optFine.classList.toggle("hidden", !show);
     optTest.classList.toggle("hidden", !show);
-    if (!show){
-      setVal(ids.E,"");
-      setVal(ids.F,"");
-    }
+    if (!show){ setVal(ids.E,""); setVal(ids.F,""); }
   }
   function setDetails(items){
     const list = document.getElementById("details");
@@ -130,31 +125,25 @@
       list.appendChild(li);
     });
   }
-  // Treat No / NotSure / blank as "No-group" for non-mandatory fields
+  // For non-mandatory fields, No-group = No or NotSure or blank
   function isNoGroup(val){ return val === "No" || val === "NotSure" || val === ""; }
+  // NEW: for ALERT CONFIG ONLY, Yes-group = Yes or NotSure
+  function isYesGroupAlert(val){ return val === "Yes" || val === "NotSure"; } // NEW
 
   function handleChange(){
-    // --- UI state rules ---
     const A = v(ids.A);
     const B = v(ids.B);
 
     // If Alert config = No → disable others (and clear)
     if (A === "No"){
       disableList([ids.B,ids.C,ids.D,ids.E,ids.F], true, true);
-      // Also hide fine tuning & security testing rows
       showRows(false);
     } else {
-      // Enable others
-      disableList([ids.B,ids.C,ids.D,ids.E,ids.F], false, false);
+      // Alert config Yes or NotSure → enable others (NEW)
+      disableList([ids.B,ids.C,ids.D,ids.E,ids.F], false, false); // NEW
       // Toggle fine tuning & security testing visibility based on Activity expected
-      if (B === "Yes"){
-        showRows(true);
-      } else {
-        showRows(false);
-      }
+      if (B === "Yes"){ showRows(true); } else { showRows(false); }
     }
-
-    // --- Outcome logic ---
     updateOutcome();
   }
 
@@ -169,7 +158,7 @@
     let outcome = "";
     let bullets = [];
 
-    // Mandatory selection for A
+    // Mandatory selection for alert configuration
     if (A === ""){
       const anyOther = [B,C,D,E,F].some(x=>x!=="");
       outcome = anyOther ? "Please select whether alert configuration is correct" : "Waiting for inputs";
@@ -179,7 +168,7 @@
       return;
     }
 
-    // If A = No → auto False Positive (others are disabled anyway)
+    // If A = No → auto False Positive
     if (A === "No"){
       outcome = "False Positive";
       bullets = [
@@ -188,17 +177,8 @@
         "No validated cybersecurity impact from this alert logic"
       ];
     }
-    // If A = Not sure → TP No Impact No Control Failure
-    else if (A === "NotSure"){
-      outcome = "True Positive No Impact No Control Failure";
-      bullets = [
-        "Alert logic appears to function but confirmation pending",
-        "Threat handled or contained",
-        "No confirmed impact and no control failure recorded"
-      ];
-    }
-    // A = Yes → evaluate full matrix
-    else if (A === "Yes" && isNoGroup(B) && C === "Yes" && isNoGroup(D)){
+    // NEW: From here on, treat A = Yes or NotSure the same
+    else if (isYesGroupAlert(A) && isNoGroup(B) && C === "Yes" && isNoGroup(D)){  // NEW
       outcome = "True Positive No Impact No Control Failure";
       bullets = [
         "Unauthorized or malicious activity detected",
@@ -207,7 +187,7 @@
         "Controls and response adequate"
       ];
     }
-    else if (A === "Yes" && isNoGroup(B) && C === "Yes" && D === "Yes"){
+    else if (isYesGroupAlert(A) && isNoGroup(B) && C === "Yes" && D === "Yes"){  // NEW
       outcome = "True Positive Impact";
       bullets = [
         "Unauthorized or malicious activity confirmed",
@@ -215,7 +195,7 @@
         "Cybersecurity impact confirmed"
       ];
     }
-    else if (A === "Yes" && isNoGroup(B) && isNoGroup(C) && isNoGroup(D)){
+    else if (isYesGroupAlert(A) && isNoGroup(B) && isNoGroup(C) && isNoGroup(D)){ // NEW
       outcome = "True Positive No Impact Control Failure";
       bullets = [
         "Unauthorized or malicious activity confirmed",
@@ -223,26 +203,26 @@
         "Required controls or response actions did not execute as expected"
       ];
     }
-    else if (A === "Yes" && B === "Yes" && isNoGroup(E) && isNoGroup(F)){
+    else if (isYesGroupAlert(A) && B === "Yes" && isNoGroup(E) && isNoGroup(F)){  // NEW
       outcome = "Benign True Positive";
       bullets = [
-        "Alert logic is correct",
+        "Alert logic is correct or presumed correct",
         "Activity is expected and approved",
         "No tuning or special handling required"
       ];
     }
-    else if (A === "Yes" && B === "Yes" && E === "Yes" && isNoGroup(F)){
+    else if (isYesGroupAlert(A) && B === "Yes" && E === "Yes" && isNoGroup(F)){   // NEW
       outcome = "Benign True Positive Fine Tuning Suppression";
       bullets = [
-        "Alert logic is correct",
+        "Alert logic is correct or presumed correct",
         "Activity is expected",
         "Pattern suitable for tuning or suppression"
       ];
     }
-    else if (A === "Yes" && B === "Yes" && F === "Yes" && isNoGroup(E)){
+    else if (isYesGroupAlert(A) && B === "Yes" && F === "Yes" && isNoGroup(E)){   // NEW
       outcome = "Benign True Positive Internal Security Testing";
       bullets = [
-        "Alert logic is correct",
+        "Alert logic is correct or presumed correct",
         "Activity linked to approved internal testing",
         "No malicious intent or impact"
       ];
